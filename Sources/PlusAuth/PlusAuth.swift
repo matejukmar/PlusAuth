@@ -6,7 +6,7 @@ import PerfectSMTP
 // TODO: missing, verify accaount, resend verification email
 
 public class PlusAuth {
-	static var shared: PlusAuth!
+	public static var shared: PlusAuth!
 	
 	let tokenConfig: TokenConfig
 	let storageConfig: StorageConfig

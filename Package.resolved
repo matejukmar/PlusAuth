@@ -38,30 +38,12 @@
         }
       },
       {
-        "package": "PerfectCZlib",
-        "repositoryURL": "https://github.com/PerfectlySoft/Perfect-CZlib-src.git",
-        "state": {
-          "branch": null,
-          "revision": "b63e46909aad937c6434766f8f8c6720d8f3bd05",
-          "version": "0.0.4"
-        }
-      },
-      {
         "package": "PerfectHTTP",
         "repositoryURL": "https://github.com/PerfectlySoft/Perfect-HTTP.git",
         "state": {
           "branch": null,
           "revision": "3332d4f4d4b52c6cf6918baa6ab510e670001e84",
           "version": "3.1.4"
-        }
-      },
-      {
-        "package": "PerfectHTTPServer",
-        "repositoryURL": "https://github.com/PerfectlySoft/Perfect-HTTPServer.git",
-        "state": {
-          "branch": null,
-          "revision": "49981001cd6ac7c9e19ea06e3a94a58e8b2b3f98",
-          "version": "3.0.19"
         }
       },
       {
