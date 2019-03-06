@@ -5,27 +5,25 @@ import Scrypt
 public typealias JWTPayload = [String: Any]
 
 public struct TokenConfig {
-	public let verifyAccountTokenExpiration: Int
-	public let resetPasswordTokenExpiration: Int
-	public let refreshTokenExpiration: Int
+	public let verifyAccountTokenExpiration: Int64
+	public let resetPasswordTokenExpiration: Int64
+	public let refreshTokenExpiration: Int64
 	public let scryptConfig: ScryptConfig
 	public let jwtStaticConfig: JWTStaticConfig
 	public let staticPayload: JWTPayload
-	public let secretKey: Key
 	
 	
 	public init(
 		scryptConfig: ScryptConfig,
 		jwtStaticConfig: JWTStaticConfig,
-		refreshTokenExpiration: Int,
-		resetPasswordTokenExpiration: Int,
-		verifyAccountTokenExpiration: Int
-		) {
+		refreshTokenExpiration: Int64,
+		resetPasswordTokenExpiration: Int64,
+		verifyAccountTokenExpiration: Int64
+	) {
 		self.resetPasswordTokenExpiration = resetPasswordTokenExpiration
 		self.scryptConfig = scryptConfig
 		self.jwtStaticConfig = jwtStaticConfig
 		self.staticPayload = Tokens.getStaticClaims(jwtStaticConfig: jwtStaticConfig)
-		self.secretKey = HMACKey([UInt8](jwtStaticConfig.secretKey))
 		self.refreshTokenExpiration = refreshTokenExpiration
 		self.verifyAccountTokenExpiration = verifyAccountTokenExpiration
 	}
@@ -36,19 +34,15 @@ var tokenConfig: TokenConfig {
 }
 
 class Tokens {
+	
 	static func generateAccessToken(
 		userId: String,
-		hash: String,
-		password: String,
 		extraPayload: JWTPayload?
 	) throws -> String {
-		let isValidPassword = try Scrypt.check(mcf: hash, password: password)
-		if (!isValidPassword) {
-			throw Err.invalidPassword
-		}
+		let conf = tokenConfig.jwtStaticConfig
 		let now = Date()
 		var payload = tokenConfig.staticPayload
-		payload["exp"] = Int(now.timeIntervalSince1970) + tokenConfig.jwtStaticConfig.expirationInterval
+		payload["exp"] = Int64(now.timeIntervalSince1970) + conf.expirationInterval
 		payload["sub"] = userId
 
 		if let extraPayload = extraPayload {
@@ -60,18 +54,18 @@ class Tokens {
 		}
 		
 		let jwtAccessTokenStr = try creator.sign(
-			alg: tokenConfig.jwtStaticConfig.algorithm,
-			key: tokenConfig.secretKey,
-			headers: tokenConfig.jwtStaticConfig.headers
+			alg: conf.algorithm,
+			key: conf.secretKey,
+			headers: conf.headers ?? [:]
 		)
 		return jwtAccessTokenStr
 	}
 	
-	static func generateRefreshToken() -> (token: String, expiration: Int) {
+	static func generateRefreshToken() -> (token: String, expiration: Int64) {
 		let now = Date()
 		return (
 			UUID().data.base64EncodedString(),
-			Int(now.timeIntervalSince1970) + tokenConfig.refreshTokenExpiration
+			Int64(now.timeIntervalSince1970) + tokenConfig.refreshTokenExpiration
 		)
 	}
 	
@@ -79,18 +73,23 @@ class Tokens {
 		guard let verifier = JWTVerifier(oldAccessToken) else {
 			throw Err.invalid
 		}
+		
+		let conf = tokenConfig.jwtStaticConfig
+		try verifier.verify(algo: conf.algorithm, key: conf.secretKey)
+
 		var payload = verifier.payload
 		
-		let now = Int(Date().timeIntervalSince1970)
-		payload["exp"] = now + tokenConfig.jwtStaticConfig.expirationInterval
+		let now = Int64(Date().timeIntervalSince1970)
+		payload["exp"] = now + conf.expirationInterval
 		
 		guard let creator = JWTCreator(payload: payload) else {
 			throw Err.unexpected
 		}
 		
 		let newAccessToken = try creator.sign(
-			alg: tokenConfig.jwtStaticConfig.algorithm,
-			key: tokenConfig.secretKey
+			alg: conf.algorithm,
+			key: conf.secretKey,
+			headers: conf.headers ?? [:]
 		)
 		
 		return newAccessToken
@@ -116,17 +115,49 @@ class Tokens {
 		return "\(hash.base64EncodedString()).\(salt.base64EncodedString())"
 	}
 	
-	static func generateVerifyAccountToken() -> (token: String, expiration: Int) {
-		return (
-			UUID().data.base64EncodedString(),
-			Int(Date().timeIntervalSince1970) + tokenConfig.verifyAccountTokenExpiration
+	static func verifyPasswordHash(hash: String, password: String) throws {
+		guard let passwordData = password.data(using: .utf8) else {
+			throw Err.invalid
+		}
+		
+		let arr = hash.split(separator: ".")
+		
+		guard arr.count == 2 else {
+			throw Err.invalid
+		}
+		
+		guard let hashData = Data(base64Encoded: String(arr[0])) else {
+			throw Err.invalid
+		}
+
+		guard let saltData = Data(base64Encoded: String(arr[1])) else {
+			throw Err.invalid
+		}
+
+		let conf = tokenConfig.scryptConfig
+
+		try Scrypt.matchPassword(
+			password: passwordData,
+			salt: saltData,
+			hash: hashData,
+			N: conf.N,
+			r: conf.r,
+			p: conf.p,
+			length: conf.hashLength
 		)
 	}
 	
-	static func generateResetPasswordToken() -> (token: String, expiration: Int) {
+	static func generateVerifyAccountToken() -> (token: String, expiration: Int64) {
+		return (
+			UUID().data.base64EncodedString(),
+			Int64(Date().timeIntervalSince1970) + tokenConfig.verifyAccountTokenExpiration
+		)
+	}
+	
+	static func generateResetPasswordToken() -> (token: String, expiration: Int64) {
 		return (
 			token: UUID().data.base64EncodedString(),
-			expiration: Int(Date().timeIntervalSince1970) + tokenConfig.resetPasswordTokenExpiration
+			expiration: Int64(Date().timeIntervalSince1970) + tokenConfig.resetPasswordTokenExpiration
 		)
 	}
 	
@@ -165,7 +196,8 @@ class Tokens {
 		guard let verifier = JWTVerifier.init(token) else {
 			throw Err.invalid
 		}
-		try verifier.verify(algo: tokenConfig.jwtStaticConfig.algorithm, key: tokenConfig.secretKey)
+		let conf = tokenConfig.jwtStaticConfig
+		try verifier.verify(algo: conf.algorithm, key: conf.secretKey)
 		let exp = verifier.payload["exp"] as! Int
 		let now = Int(Date().timeIntervalSince1970)
 		if now > exp {
@@ -198,16 +230,50 @@ public struct ScryptConfig {
 	public let N: Int
 	public let r: Int
 	public let p: Int
+
+	public init(
+		hashLength: Int,
+		saltLength: Int,
+		N: Int,
+		r: Int,
+		p: Int
+	) {
+		self.hashLength = hashLength
+		self.saltLength = saltLength
+		self.N = N
+		self.r = r
+		self.p = p
+	}
 }
 
 public struct JWTStaticConfig {
 	public let algorithm: JWT.Alg
-	public let secretKey: Data
-	public let headers: JWTPayload
-	public let expirationInterval: Int
+	public let secretKey: Key
+	public let headers: JWTPayload?
+	public let expirationInterval: Int64
 	public let iss: String?
 	public let aud: String?
 	public let publicClaims: JWTPayload?
 	public let privateClaims: JWTPayload?
+	
+	public init(
+		algorithm: JWT.Alg,
+		secretKey: Key,
+		headers: JWTPayload?,
+		expirationInterval: Int64,
+		iss: String?,
+		aud: String?,
+		publicClaims: JWTPayload?,
+		privateClaims: JWTPayload?
+	) {
+		self.algorithm = algorithm
+		self.secretKey = secretKey
+		self.headers = headers
+		self.expirationInterval = expirationInterval
+		self.iss = iss
+		self.aud = aud
+		self.publicClaims = publicClaims
+		self.privateClaims = privateClaims
+	}
 }
 

@@ -1,6 +1,7 @@
 import Foundation
 import PerfectHTTP
 import PerfectMySQL
+import Scrypt
 
 func signIn(request: HTTPRequest, response: HTTPResponse) {
 	response.setHeader(.contentType, value: "application/json")
@@ -20,10 +21,10 @@ func signIn(request: HTTPRequest, response: HTTPResponse) {
 		
 		let (userId, hash) = try storage.selectUserHash(byEmail: email)
 		
+		try Tokens.verifyPasswordHash(hash: hash, password: password)
+		
 		let accessToken = try Tokens.generateAccessToken(
 			userId: userId,
-			hash: hash,
-			password: password,
 			extraPayload: nil
 		)
 		
@@ -40,9 +41,11 @@ func signIn(request: HTTPRequest, response: HTTPResponse) {
 		response.setBody(bytes: body.toBytes())
 	} catch Err.request {
 		response.status = .badRequest
+	} catch Scrypt.Err.invalidPassword {
+		response.status = .unauthorized
 	} catch Err.notFound {
 		response.status = .notFound
-	} catch {
+	} catch (let error) {
 		response.status = .internalServerError
 	}
 	

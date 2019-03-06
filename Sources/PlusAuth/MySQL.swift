@@ -8,6 +8,18 @@ public struct MySQLConfig {
 	public let user: String
 	public let password: String
 	public let db: String
+	
+	public init(
+		host: String,
+		user: String,
+		password: String,
+		db: String
+	) {
+		self.host = host
+		self.user = user
+		self.password = password
+		self.db = db
+	}
 }
 
 extension MySQL {
@@ -120,7 +132,7 @@ class MySQLStorage: Storage {
 		guard let row = results.next() else {
 			throw Err.notFound
 		}
-		return (row[0] as! String, (row[1] as! Int) > 0)
+		return (row[0] as! String, (row[1] as! Int8) > 0)
 	}
 	
 	func selectUserVerified(byId id: String) throws -> Bool {
@@ -141,14 +153,14 @@ class MySQLStorage: Storage {
 		guard let row = results.next() else {
 			throw Err.notFound
 		}
-		return (row[1] as! Int) > 0
+		return (row[0] as! Int8) > 0
 	}
 
 	
 	func insertUser(userId: String, email: String, hash: String) throws {
 		let st = MySQLStmt(mysql)
 		
-		guard st.prepare(statement: "insert into Users (id, email, hash, verified, deleted) values (?, ?, ?, ?)") else {
+		guard st.prepare(statement: "insert into Users (id, email, hash, verified, deleted) values (?, ?, ?, ?, ?)") else {
 			throw Err.mysql
 		}
 		st.bindParam(userId)
@@ -194,7 +206,7 @@ class MySQLStorage: Storage {
 	}
 
 	
-	func insertRefreshToken(userId: String, token: String, expiration: Int) throws {
+	func insertRefreshToken(userId: String, token: String, expiration: Int64) throws {
 		let st = MySQLStmt(mysql)
 		guard st.prepare(statement: "insert into RefreshTokens (userId, token, expiration) values (?, ?, ?)") else {
 			throw Err.mysql
@@ -208,7 +220,7 @@ class MySQLStorage: Storage {
 		}
 	}
 	
-	func selectRefreshToken(token: String) throws -> (expiration: Int, userId: String) {
+	func selectRefreshToken(token: String) throws -> (expiration: Int64, userId: String) {
 		let st = MySQLStmt(mysql)
 		
 		guard st.prepare(
@@ -229,7 +241,7 @@ class MySQLStorage: Storage {
 			throw Err.notFound
 		}
 		
-		return (row[0] as! Int, row[1] as! String)
+		return (row[0] as! Int64, row[1] as! String)
 	}
 	
 	func deleteRefreshToken(token: String) throws {
@@ -249,7 +261,7 @@ class MySQLStorage: Storage {
 	}
 	
 	
-	func insertVerifyAccountToken(token: String, expiration: Int, userId: String) throws {
+	func insertVerifyAccountToken(token: String, expiration: Int64, userId: String) throws {
 		let st = MySQLStmt(mysql)
 		guard st.prepare(statement: "insert into VerifyAccountTokens (token, expiration, userId) values (?, ?, ?)") else {
 			throw Err.mysql
@@ -264,7 +276,7 @@ class MySQLStorage: Storage {
 		}
 	}
 	
-	func selectVerifyAccountToken(token: String) throws -> (expiration: Int, userId: String) {
+	func selectVerifyAccountToken(token: String) throws -> (expiration: Int64, userId: String) {
 		let st = MySQLStmt(mysql)
 		
 		guard st.prepare(
@@ -285,7 +297,7 @@ class MySQLStorage: Storage {
 			throw Err.notFound
 		}
 		
-		return (row[0] as! Int, row[1] as! String)
+		return (row[0] as! Int64, row[1] as! String)
 	}
 	
 	func deleteVerifyAccountToken(token: String) throws {
@@ -304,7 +316,7 @@ class MySQLStorage: Storage {
 		}
 	}
 	
-	func insertResetPasswordToken(token: String, expiration: Int, userId: String) throws {
+	func insertResetPasswordToken(token: String, expiration: Int64, userId: String) throws {
 		let st = MySQLStmt(mysql)
 		guard st.prepare(statement: "insert into ResetPasswordTokens (token, expiration, userId) values (?, ?, ?)") else {
 			throw Err.mysql
@@ -319,7 +331,7 @@ class MySQLStorage: Storage {
 		}
 	}
 	
-	func selectResetPasswordToken(token: String) throws -> (expiration: Int, userId: String) {
+	func selectResetPasswordToken(token: String) throws -> (expiration: Int64, userId: String) {
 		let st = MySQLStmt(mysql)
 		
 		guard st.prepare(
@@ -340,7 +352,7 @@ class MySQLStorage: Storage {
 			throw Err.notFound
 		}
 		
-		return (row[0] as! Int, row[1] as! String)
+		return (row[0] as! Int64, row[1] as! String)
 	}
 	
 	func deleteResetPasswordToken(token: String) throws {

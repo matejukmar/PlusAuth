@@ -1,6 +1,7 @@
 import Foundation
 import PerfectHTTP
 import PerfectMySQL
+import PerfectCrypto
 
 func refreshAccessToken(request: HTTPRequest, response: HTTPResponse) {
 	response.setHeader(.contentType, value: "application/json")
@@ -28,7 +29,7 @@ func refreshAccessToken(request: HTTPRequest, response: HTTPResponse) {
 			throw Err.unverified
 		}
 		
-		let now = Int(Date().timeIntervalSince1970)
+		let now = Int64(Date().timeIntervalSince1970)
 		
 		guard now < expiration else {
 			try storage.deleteRefreshToken(token: refreshToken)
@@ -58,6 +59,9 @@ func refreshAccessToken(request: HTTPRequest, response: HTTPResponse) {
 	} catch Err.unverified {
 		response.status = .methodNotAllowed
 	} catch Err.request {
+		response.status = .badRequest
+	} catch JWT.Error.verificationError(let message) {
+		print("jwt error", message)
 		response.status = .badRequest
 	} catch Err.notFound {
 		response.status = .notFound

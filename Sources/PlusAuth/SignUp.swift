@@ -1,6 +1,7 @@
 import Foundation
 import PerfectHTTP
 import PerfectMySQL
+import PerfectSMTP
 
 func signUp(request: HTTPRequest, response: HTTPResponse) {
 	response.setHeader(.contentType, value: "application/json")
@@ -35,7 +36,13 @@ func signUp(request: HTTPRequest, response: HTTPResponse) {
 		try EmailManager.sendVerifyAccountEmail(emailAddress: email, token: token)
 
 		response.status = .ok
-	} catch {
+	} catch Err.request {
+		response.status = .badRequest
+	} catch	SMTPError.general(let code, let message) {
+		print("smtp code", code, "error", message)
+		response.status = .internalServerError
+	} catch (let error){
+		print("other err", error)
 		response.status = .internalServerError
 	}
 	response.completed()
@@ -59,7 +66,7 @@ func verifyAccount(request: HTTPRequest, response: HTTPResponse) {
 		
 		let (expiration, userId) = try storage.selectVerifyAccountToken(token: token)
 		
-		let now = Int(Date().timeIntervalSince1970)
+		let now = Int64(Date().timeIntervalSince1970)
 		
 		guard now < expiration else {
 			try storage.deleteVerifyAccountToken(token: token)
@@ -68,7 +75,13 @@ func verifyAccount(request: HTTPRequest, response: HTTPResponse) {
 		
 		try storage.updateUserVerification(userId: userId, verified: true)
 		
+		try storage.deleteVerifyAccountToken(token: token)
+
 		response.status = .ok
+	} catch Err.notFound {
+		response.status = .notFound
+	} catch Err.expired {
+		response.status = .unauthorized
 	} catch {
 		response.status = .internalServerError
 	}
@@ -108,6 +121,8 @@ func resendVerificationEmail(request: HTTPRequest, response: HTTPResponse) {
 		try EmailManager.sendVerifyAccountEmail(emailAddress: email, token: token)
 
 		response.status = .ok
+	} catch Err.invalid {
+		response.status = .badRequest
 	} catch {
 		response.status = .internalServerError
 	}

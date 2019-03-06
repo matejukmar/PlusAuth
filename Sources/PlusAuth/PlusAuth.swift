@@ -41,8 +41,8 @@ public class PlusAuth {
 		routes.add(method: .patch, uri: "\(prefix)verifyAccount", handler: verifyAccount)
 		routes.add(method: .patch, uri: "\(prefix)resendVerificationEmail", handler: resendVerificationEmail)
 		routes.add(method: .patch, uri: "\(prefix)refreshAccessToken", handler: refreshAccessToken)
-		routes.add(method: .post, uri: "\(prefix)resetPasswordRequest", handler: resetPasswordRequest)
-		routes.add(method: .post, uri: "\(prefix)resetPassword", handler: resetPassword)
+		routes.add(method: .post, uri: "\(prefix)resetPassword", handler: resetPasswordRequest)
+		routes.add(method: .patch, uri: "\(prefix)resetPassword", handler: resetPassword)
 	}
 	
 	func storage() throws -> Storage {
@@ -65,4 +65,18 @@ public struct EmailConfig {
 	public let fromEmail: String
 	public let verifyAccountBaseUrl: String
 	public let resetPasswordBaseUrl: String
+	
+	public init(
+		smtpClient: SMTPClient,
+		fromName: String,
+		fromEmail: String,
+		verifyAccountBaseUrl: String,
+		resetPasswordBaseUrl: String
+	) {
+		self.smtpClient = smtpClient
+		self.fromName = fromName
+		self.fromEmail = fromEmail
+		self.verifyAccountBaseUrl = verifyAccountBaseUrl
+		self.resetPasswordBaseUrl = resetPasswordBaseUrl
+	}
 }
