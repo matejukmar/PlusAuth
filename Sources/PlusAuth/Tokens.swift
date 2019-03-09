@@ -33,9 +33,9 @@ var tokenConfig: TokenConfig {
 	return PlusAuth.shared.tokenConfig
 }
 
-class Tokens {
+public class Tokens {
 	
-	static func generateAccessToken(
+	public static func generateAccessToken(
 		userId: String,
 		extraPayload: JWTPayload?
 	) throws -> String {
@@ -61,7 +61,7 @@ class Tokens {
 		return jwtAccessTokenStr
 	}
 	
-	static func generateRefreshToken() -> (token: String, expiration: Int64) {
+	public static func generateRefreshToken() -> (token: String, expiration: Int64) {
 		let now = Date()
 		return (
 			UUID().data.base64EncodedString(),
@@ -69,7 +69,7 @@ class Tokens {
 		)
 	}
 	
-	static func refreshAccessToken(oldAccessToken: String) throws -> String {
+	public static func refreshAccessToken(oldAccessToken: String) throws -> String {
 		guard let verifier = JWTVerifier(oldAccessToken) else {
 			throw Err.invalid
 		}
@@ -96,11 +96,11 @@ class Tokens {
 	}
 
 
-	static func generateUserId() -> String {
+	public static func generateUserId() -> String {
 		return UUID().data.base64EncodedString()
 	}
 
-	static func generatePasswordHash(password: String) throws -> String {
+	public static func generatePasswordHash(password: String) throws -> String {
 		let scryptConfig = tokenConfig.scryptConfig
 		let salt = try Scrypt.generateSalt(length: scryptConfig.saltLength)
 		let hash = try Scrypt.generateHash(
@@ -115,7 +115,7 @@ class Tokens {
 		return "\(hash.base64EncodedString()).\(salt.base64EncodedString())"
 	}
 	
-	static func verifyPasswordHash(hash: String, password: String) throws {
+	public static func verifyPasswordHash(hash: String, password: String) throws {
 		guard let passwordData = password.data(using: .utf8) else {
 			throw Err.invalid
 		}
@@ -147,21 +147,21 @@ class Tokens {
 		)
 	}
 	
-	static func generateVerifyAccountToken() -> (token: String, expiration: Int64) {
+	public static func generateVerifyAccountToken() -> (token: String, expiration: Int64) {
 		return (
 			UUID().data.base64EncodedString(),
 			Int64(Date().timeIntervalSince1970) + tokenConfig.verifyAccountTokenExpiration
 		)
 	}
 	
-	static func generateResetPasswordToken() -> (token: String, expiration: Int64) {
+	public static func generateResetPasswordToken() -> (token: String, expiration: Int64) {
 		return (
 			token: UUID().data.base64EncodedString(),
 			expiration: Int64(Date().timeIntervalSince1970) + tokenConfig.resetPasswordTokenExpiration
 		)
 	}
 	
-	static func getAccessToken(bearer: String?) throws -> String {
+	public static func getAccessToken(bearer: String?) throws -> String {
 		guard let bearerStr = bearer else {
 			throw Err.invalid
 		}
@@ -175,24 +175,24 @@ class Tokens {
 		return String(arr[1])
 	}
 
-	static func getAccessTokenPayload(bearer: String?) throws -> [String: Any] {
+	public static func getAccessTokenPayload(bearer: String?) throws -> [String: Any] {
 		return try getAccessTokenPayload(
 			accessToken: try getAccessToken(bearer: bearer)
 		)
 	}
 	
-	static func getAccessTokenPayload(accessToken: String) throws -> [String: Any] {
+	public static func getAccessTokenPayload(accessToken: String) throws -> [String: Any] {
 		guard let verifier = JWTVerifier.init(accessToken) else {
 			throw Err.invalid
 		}
 		return verifier.payload
 	}
 
-	static func verifyBearer(_ header: String?) throws {
+	public static func verifyBearer(_ header: String?) throws {
 		try verifyAccessToken(getAccessToken(bearer: header))
 	}
 	
-	static func verifyAccessToken(_ token: String) throws {
+	public static func verifyAccessToken(_ token: String) throws {
 		guard let verifier = JWTVerifier.init(token) else {
 			throw Err.invalid
 		}
@@ -205,7 +205,7 @@ class Tokens {
 		}
 	}
 	
-	static func getStaticClaims(jwtStaticConfig: JWTStaticConfig) -> JWTPayload {
+	public static func getStaticClaims(jwtStaticConfig: JWTStaticConfig) -> JWTPayload {
 		var payload: JWTPayload = [:]
 		if let iss = jwtStaticConfig.iss {
 			payload["iss"] = iss

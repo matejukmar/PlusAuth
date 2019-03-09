@@ -46,6 +46,7 @@ func signIn(request: HTTPRequest, response: HTTPResponse) {
 	} catch Err.notFound {
 		response.status = .notFound
 	} catch (let error) {
+		print("error", error)
 		response.status = .internalServerError
 	}
 	

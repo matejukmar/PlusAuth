@@ -51,14 +51,6 @@ public class PlusAuth {
 
 }
 
-public enum StorageConfig {
-	case mysql(MySQLConfig)
-	// below not implemented, if we need to migrate for any reason
-	case postgress
-	case mongodb
-	case orm
-}
-
 public struct EmailConfig {
 	public let smtpClient: SMTPClient
 	public let fromName: String

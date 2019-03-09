@@ -1,6 +1,14 @@
 import Foundation
 import PerfectMySQL
 
+public enum StorageConfig {
+	case mysql(MySQLConfig)
+	// below not implemented, if we need to migrate for any reason
+	case postgress
+	case mongodb
+	case orm
+}
+
 protocol Storage {
 	// Users / Sccounts
 	func selectUserId(byEmail email: String) throws -> String

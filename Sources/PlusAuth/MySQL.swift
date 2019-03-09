@@ -1,7 +1,7 @@
 import Foundation
 import PerfectMySQL
 
-let mySQLDateFormat = "yyyy-MM-dd HH:mm:ss"
+public let MYSQL_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
 
 public struct MySQLConfig {
 	public let host: String
@@ -22,18 +22,36 @@ public struct MySQLConfig {
 	}
 }
 
-extension MySQL {
-	static func new() throws -> MySQL {
+public  extension Date {
+	public var mySQLStr: String {
+		let df = DateFormatter()
+		df.dateFormat = MYSQL_DATE_FORMAT
+		return df.string(from: self)
+	}
+	
+	public init?(mySQLStr: String) {
+		let df = DateFormatter()
+		df.dateFormat = MYSQL_DATE_FORMAT
+		if let date = df.date(from: mySQLStr) {
+			self = date
+		} else {
+			return nil
+		}
+	}
+}
+
+public extension MySQL {
+	public static func new() throws -> MySQL {
 		let mysql = MySQL()
 		
 		switch PlusAuth.shared.storageConfig {
 		case .mysql(let config):
-			let connection = mysql.connect(
+			let status = mysql.connect(
 				host: config.host,
 				user: config.user,
 				password: config.password
 			)
-			guard connection else {
+			guard status else {
 				throw Err.mysql
 			}
 			guard mysql.selectDatabase(named: config.db) else {
@@ -42,25 +60,6 @@ extension MySQL {
 			return mysql
 		default:
 			throw Err.mysql
-		}
-		
-	}
-}
-
-extension Date {
-	var mySQLStr: String {
-		let df = DateFormatter()
-		df.dateFormat = mySQLDateFormat
-		return df.string(from: self)
-	}
-	
-	init?(mySQLStr: String) {
-		let df = DateFormatter()
-		df.dateFormat = mySQLDateFormat
-		if let date = df.date(from: mySQLStr) {
-			self = date
-		} else {
-			return nil
 		}
 	}
 }
