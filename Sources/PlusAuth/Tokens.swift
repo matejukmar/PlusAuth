@@ -42,7 +42,7 @@ public class Tokens {
 		let conf = tokenConfig.jwtStaticConfig
 		let now = Date()
 		var payload = tokenConfig.staticPayload
-		payload["exp"] = Int64(now.timeIntervalSince1970) + conf.expirationInterval
+		payload["exp"] = String(Int64(now.timeIntervalSince1970) + conf.expirationInterval)
 		payload["sub"] = userId
 
 		if let extraPayload = extraPayload {
@@ -80,7 +80,7 @@ public class Tokens {
 		var payload = verifier.payload
 		
 		let now = Int64(Date().timeIntervalSince1970)
-		payload["exp"] = now + conf.expirationInterval
+		payload["exp"] = String(now + conf.expirationInterval)
 		
 		guard let creator = JWTCreator(payload: payload) else {
 			throw Err.unexpected
@@ -198,8 +198,13 @@ public class Tokens {
 		}
 		let conf = tokenConfig.jwtStaticConfig
 		try verifier.verify(algo: conf.algorithm, key: conf.secretKey)
-		let exp = verifier.payload["exp"] as! Int
-		let now = Int(Date().timeIntervalSince1970)
+		guard let expStr = verifier.payload["exp"] as? String else {
+			throw Err.invalid
+		}
+		guard let exp = Int64(expStr) else {
+			throw Err.invalid
+		}
+		let now = Int64(Date().timeIntervalSince1970)
 		if now > exp {
 			throw Err.expired
 		}

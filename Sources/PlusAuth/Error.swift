@@ -10,4 +10,5 @@ enum Err: Error {
 	case unexpected
 	case invalid
 	case unverified
+	case alreadyExists
 }

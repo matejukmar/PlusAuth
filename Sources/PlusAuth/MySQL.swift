@@ -71,9 +71,27 @@ class MySQLStorage: Storage {
 		self.mysql = mysql
 	}
 	
-	func selectUserId(byEmail email: String) throws -> String {
+	func startTransaction() throws {
+		guard mysql.query(statement: "START TRANSACTION") else {
+			throw Err.mysql
+		}
+	}
+	
+	func commit() throws {
+		guard mysql.query(statement: "COMMIT") else {
+			throw Err.mysql
+		}
+	}
+	
+	func rollback() throws {
+		guard mysql.query(statement: "ROLLBACK") else {
+			throw Err.mysql
+		}
+	}
+	
+	func selectUser(byEmail email: String) throws -> (id: String, name: String) {
 		let st = MySQLStmt(mysql)
-		guard st.prepare(statement: "select id from Users where email = ? and deleted = ?") else {
+		guard st.prepare(statement: "select id, name from Users where email = ? and deleted = ?") else {
 			throw Err.mysql
 		}
 		st.bindParam(email)
@@ -89,7 +107,7 @@ class MySQLStorage: Storage {
 		guard let row = results.next() else {
 			throw Err.notFound
 		}
-		return row[0] as! String
+		return (row[0] as! String, row[1] as! String)
 	}
 	
 	func selectUserHash(byEmail email: String) throws -> (id: String, hash: String) {
@@ -113,9 +131,9 @@ class MySQLStorage: Storage {
 		return (row[0] as! String, row[1] as! String)
 	}
 	
-	func selectUserVerified(byEmail email: String) throws -> (id: String, verified: Bool) {
+	func selectUserVerified(byEmail email: String) throws -> (id: String, verified: Bool, name: String) {
 		let st = MySQLStmt(mysql)
-		guard st.prepare(statement: "select id, verified from Users where email = ? and deleted = ?") else {
+		guard st.prepare(statement: "select id, verified, name from Users where email = ? and deleted = ?") else {
 			throw Err.mysql
 		}
 		st.bindParam(email)
@@ -131,7 +149,7 @@ class MySQLStorage: Storage {
 		guard let row = results.next() else {
 			throw Err.notFound
 		}
-		return (row[0] as! String, (row[1] as! Int8) > 0)
+		return (row[0] as! String, (row[1] as! Int8) > 0, row[2] as! String)
 	}
 	
 	func selectUserVerified(byId id: String) throws -> Bool {
@@ -156,21 +174,26 @@ class MySQLStorage: Storage {
 	}
 
 	
-	func insertUser(userId: String, email: String, hash: String) throws {
+	func insertUser(userId: String, email: String, hash: String, name: String) throws {
 		let st = MySQLStmt(mysql)
 		
-		guard st.prepare(statement: "insert into Users (id, email, hash, verified, deleted) values (?, ?, ?, ?, ?)") else {
+		guard st.prepare(statement: "insert into Users (id, email, hash, name, verified, deleted) values (?, ?, ?, ?, ?, ?)") else {
 			throw Err.mysql
 		}
 		st.bindParam(userId)
 		st.bindParam(email)
 		st.bindParam(hash)
+		st.bindParam(name)
 		st.bindParam(0)
 		st.bindParam(0)
 		
 		guard st.execute() else {
-			print(mysql.errorMessage())
-			throw Err.mysql
+			print("error", mysql.errorCode(), mysql.errorMessage())
+			if (mysql.errorCode() == 1062) {
+				throw Err.alreadyExists
+			} else {
+				throw Err.mysql
+			}
 		}
 	}
 	
@@ -203,27 +226,61 @@ class MySQLStorage: Storage {
 			throw Err.mysql
 		}
 	}
+	
+	func selectUserName(id: String) throws -> String {
+		let st = MySQLStmt(mysql)
+		
+		guard st.prepare(statement: "select name from Users where id = ?") else {
+			throw Err.mysql
+		}
+		
+		st.bindParam(id)
+		
+		guard st.execute() else {
+			throw Err.mysql
+		}
+		
+		let results = st.results()
+		
+		guard let row = results.next() else {
+			throw Err.notFound
+		}
+		
+		return row[0] as! String
+	}
+
 
 	
-	func insertRefreshToken(userId: String, token: String, expiration: Int64) throws {
+	func insertRefreshToken(userId: String, token: String, expiration: Int64, appId: String) throws {
 		let st = MySQLStmt(mysql)
-		guard st.prepare(statement: "insert into RefreshTokens (userId, token, expiration) values (?, ?, ?)") else {
+		guard st.prepare(statement: """
+			insert into RefreshTokens
+			(userId, token, expiration, appId)
+			values
+			(?, ?, ?, ?)
+			on duplicate key update
+			token = ?,
+			expiration = ?
+		""") else {
 			throw Err.mysql
 		}
 		st.bindParam(userId)
 		st.bindParam(token)
 		st.bindParam(expiration)
-		
+		st.bindParam(appId)
+		st.bindParam(token)
+		st.bindParam(expiration)
+
 		guard st.execute() else {
 			throw Err.mysql
 		}
 	}
 	
-	func selectRefreshToken(token: String) throws -> (expiration: Int64, userId: String) {
+	func selectRefreshToken(token: String) throws -> (expiration: Int64, userId: String, appId: String) {
 		let st = MySQLStmt(mysql)
 		
 		guard st.prepare(
-			statement: "select expiration, userId from RefreshTokens where token = ?"
+			statement: "select expiration, userId, appId from RefreshTokens where token = ?"
 			) else {
 				throw Err.mysql
 		}
@@ -240,7 +297,7 @@ class MySQLStorage: Storage {
 			throw Err.notFound
 		}
 		
-		return (row[0] as! Int64, row[1] as! String)
+		return (row[0] as! Int64, row[1] as! String, row[2] as! String)
 	}
 	
 	func deleteRefreshToken(token: String) throws {

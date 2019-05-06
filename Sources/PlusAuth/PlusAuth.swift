@@ -57,18 +57,24 @@ public struct EmailConfig {
 	public let fromEmail: String
 	public let verifyAccountBaseUrl: String
 	public let resetPasswordBaseUrl: String
+	public let verifyAccountEmailTemplate: String
+	public let resetPasswordEmailTemplate: String
 	
 	public init(
 		smtpClient: SMTPClient,
 		fromName: String,
 		fromEmail: String,
 		verifyAccountBaseUrl: String,
-		resetPasswordBaseUrl: String
+		resetPasswordBaseUrl: String,
+		verifyAccountEmailTemplate: String,
+		resetPasswordEmailTemplate: String
 	) {
 		self.smtpClient = smtpClient
 		self.fromName = fromName
 		self.fromEmail = fromEmail
 		self.verifyAccountBaseUrl = verifyAccountBaseUrl
 		self.resetPasswordBaseUrl = resetPasswordBaseUrl
+		self.verifyAccountEmailTemplate = verifyAccountEmailTemplate
+		self.resetPasswordEmailTemplate = resetPasswordEmailTemplate
 	}
 }

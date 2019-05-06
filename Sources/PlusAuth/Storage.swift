@@ -11,17 +11,22 @@ public enum StorageConfig {
 
 protocol Storage {
 	// Users / Sccounts
-	func selectUserId(byEmail email: String) throws -> String
+	func startTransaction() throws
+	func commit() throws
+	func rollback() throws
+	
+	func selectUser(byEmail email: String) throws -> (id: String, name: String)
 	func selectUserHash(byEmail email: String) throws -> (id: String, hash: String)
-	func selectUserVerified(byEmail email: String) throws -> (id: String, verified: Bool)
+	func selectUserVerified(byEmail email: String) throws -> (id: String, verified: Bool, name: String)
 	func selectUserVerified(byId id: String) throws -> Bool
-	func insertUser(userId: String, email: String, hash: String) throws
+	func insertUser(userId: String, email: String, hash: String, name: String) throws
 	func updateUserHash(userId: String, hash: String) throws
 	func updateUserVerification(userId: String, verified: Bool) throws
+	func selectUserName(id: String) throws -> String
 
 	// Refresh Tokens
-	func insertRefreshToken(userId: String, token: String, expiration: Int64) throws
-	func selectRefreshToken(token: String) throws -> (expiration: Int64, userId: String)
+	func insertRefreshToken(userId: String, token: String, expiration: Int64, appId: String) throws
+	func selectRefreshToken(token: String) throws -> (expiration: Int64, userId: String, appId: String)
 	func deleteRefreshToken(token: String) throws
 
 	// Verify Account Tokens

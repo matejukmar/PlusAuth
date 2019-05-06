@@ -12,6 +12,7 @@ func signUp(request: HTTPRequest, response: HTTPResponse) {
 				with: Data(bytes: bytes),
 				options: []
 				) as? [String: Any],
+			let name = json["name"] as? String,
 			let email = json["email"] as? String,
 			let password = json["password"] as? String
 		else {
@@ -19,28 +20,34 @@ func signUp(request: HTTPRequest, response: HTTPResponse) {
 		}
 		
 		let storage = try PlusAuth.shared.storage()
-
-		let userId = Tokens.generateUserId()
-		let hash = try Tokens.generatePasswordHash(password: password)
-		
-		try storage.insertUser(userId: userId, email: email, hash: hash)
-		
-		let (token, expiration) = Tokens.generateVerifyAccountToken()
-		
-		try storage.insertVerifyAccountToken(
-			token: token,
-			expiration: expiration,
-			userId: userId
-		)
-		
-		try EmailManager.sendVerifyAccountEmail(emailAddress: email, token: token)
-
-		response.status = .ok
+		try storage.startTransaction()
+		do {
+			let userId = Tokens.generateUserId()
+			let hash = try Tokens.generatePasswordHash(password: password)
+			
+			try storage.insertUser(userId: userId, email: email, hash: hash, name: name)
+			
+			let (token, expiration) = Tokens.generateVerifyAccountToken()
+			
+			try storage.insertVerifyAccountToken(
+				token: token,
+				expiration: expiration,
+				userId: userId
+			)
+			try EmailManager.sendVerifyAccountEmail(emailAddress: email, token: token, name: name)
+			try storage.commit()
+			response.status = .ok
+		} catch (let error) {
+			try storage.rollback()
+			throw error
+		}
 	} catch Err.request {
 		response.status = .badRequest
 	} catch	SMTPError.general(let code, let message) {
 		print("smtp code", code, "error", message)
 		response.status = .internalServerError
+	} catch Err.alreadyExists {
+		response.status = .conflict
 	} catch (let error){
 		print("other err", error)
 		response.status = .internalServerError
@@ -63,21 +70,22 @@ func verifyAccount(request: HTTPRequest, response: HTTPResponse) {
 		}
 		
 		let storage = try PlusAuth.shared.storage()
-		
-		let (expiration, userId) = try storage.selectVerifyAccountToken(token: token)
-		
-		let now = Int64(Date().timeIntervalSince1970)
-		
-		guard now < expiration else {
+		try storage.startTransaction()
+		do {
+			let (expiration, userId) = try storage.selectVerifyAccountToken(token: token)
+			let now = Int64(Date().timeIntervalSince1970)
+			guard now < expiration else {
+				try storage.deleteVerifyAccountToken(token: token)
+				throw Err.expired
+			}
+			try storage.updateUserVerification(userId: userId, verified: true)
 			try storage.deleteVerifyAccountToken(token: token)
-			throw Err.expired
+			try storage.commit()
+			response.status = .ok
+		} catch (let error) {
+			try storage.rollback()
+			throw error
 		}
-		
-		try storage.updateUserVerification(userId: userId, verified: true)
-		
-		try storage.deleteVerifyAccountToken(token: token)
-
-		response.status = .ok
 	} catch Err.notFound {
 		response.status = .notFound
 	} catch Err.expired {
@@ -103,24 +111,25 @@ func resendVerificationEmail(request: HTTPRequest, response: HTTPResponse) {
 		}
 		
 		let storage = try PlusAuth.shared.storage()
-		
-		let (userId, verified) = try storage.selectUserVerified(byEmail: email)
-		
-		guard !verified else {
-			throw Err.invalid
+		try storage.startTransaction()
+		do {
+			let (userId, verified, name) = try storage.selectUserVerified(byEmail: email)
+			guard !verified else {
+				throw Err.invalid
+			}
+			let (token, expiration) = Tokens.generateVerifyAccountToken()
+			try storage.insertVerifyAccountToken(
+				token: token,
+				expiration: expiration,
+				userId: userId
+			)
+			try EmailManager.sendVerifyAccountEmail(emailAddress: email, token: token, name: name)
+			try storage.commit()
+			response.status = .ok
+		} catch (let error) {
+			try storage.rollback()
+			throw error
 		}
-		
-		let (token, expiration) = Tokens.generateVerifyAccountToken()
-		
-		try storage.insertVerifyAccountToken(
-			token: token,
-			expiration: expiration,
-			userId: userId
-		)
-		
-		try EmailManager.sendVerifyAccountEmail(emailAddress: email, token: token)
-
-		response.status = .ok
 	} catch Err.invalid {
 		response.status = .badRequest
 	} catch {

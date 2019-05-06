@@ -17,23 +17,28 @@ func resetPasswordRequest(request: HTTPRequest, response: HTTPResponse) {
 		}
 		
 		let storage = try PlusAuth.shared.storage()
+		try storage.startTransaction()
+		do {
+			let (userId, name) = try storage.selectUser(byEmail: email)
+			let (token, expiration) = Tokens.generateResetPasswordToken()
+			try storage.insertResetPasswordToken(
+				token: token,
+				expiration: expiration,
+				userId: userId
+			)
+			
+			try EmailManager.sendForgottenPasswordEmail(
+				emailAddress: email,
+				token: token,
+				name: name
+			)
+			try storage.commit()
+			response.status = .ok
 
-		
-		let userId = try storage.selectUserId(byEmail: email)
-		let (token, expiration) = Tokens.generateResetPasswordToken()
-		try storage.insertResetPasswordToken(
-			token: token,
-			expiration: expiration,
-			userId: userId
-		)
-		
-		try EmailManager.sendForgottenPasswordEmail(
-			emailAddress: email,
-			token: token
-		)
-		
-		response.status = .ok
-		
+		} catch (let error) {
+			try storage.rollback()
+			throw error
+		}
 	} catch Err.request {
 		response.status = .badRequest
 	} catch Err.notFound {
@@ -62,21 +67,22 @@ func resetPassword(request: HTTPRequest, response: HTTPResponse) {
 		}
 		
 		let storage = try PlusAuth.shared.storage()
-
-		let (expiration, userId) = try storage.selectResetPasswordToken(token: token)
-		
-		let now = Int(Date().timeIntervalSince1970)
-		guard now < expiration else {
-			try storage.deleteResetPasswordToken(token: token)
-			throw Err.expired
+		try storage.startTransaction()
+		do {
+			let (expiration, userId) = try storage.selectResetPasswordToken(token: token)
+			let now = Int(Date().timeIntervalSince1970)
+			guard now < expiration else {
+				try storage.deleteResetPasswordToken(token: token)
+				throw Err.expired
+			}
+			let hash = try Tokens.generatePasswordHash(password: password)
+			try storage.updateUserHash(userId: userId, hash: hash)
+			try storage.commit()
+			response.status = .ok
+		} catch (let error) {
+			try storage.rollback()
+			throw error
 		}
-		
-		let hash = try Tokens.generatePasswordHash(password: password)
-		
-		try storage.updateUserHash(userId: userId, hash: hash)
-		
-		response.status = .ok
-		
 	} catch Err.request {
 		response.status = .badRequest
 	} catch Err.notFound {
